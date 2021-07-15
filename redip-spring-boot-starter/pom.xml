@@ -10,6 +10,7 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
+    <groupId>org.openingo.boot</groupId>
     <artifactId>redip-spring-boot-starter</artifactId>
 
     <dependencyManagement>
@@ -26,7 +27,7 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.openingo</groupId>
+            <groupId>org.openingo.kits</groupId>
             <artifactId>redip</artifactId>
         </dependency>
         <dependency>

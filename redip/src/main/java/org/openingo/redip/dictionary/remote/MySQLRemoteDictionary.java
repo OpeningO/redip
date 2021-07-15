@@ -48,6 +48,8 @@ public class MySQLRemoteDictionary extends AbstractRemoteDictionary {
 				words.add(word);
 			}
 			log.info("'mysql' remote dictionary append '{}' words.", words.size());
+			log.info("'mysql' remote dictionary update dictionary state from domain '{}' dictionary '{}'", domain, dictionaryType);
+			this.resetState(connection, domain);
 			statement.close();
 			resultSet.close();
 		} catch (SQLException e) {
@@ -62,22 +64,30 @@ public class MySQLRemoteDictionary extends AbstractRemoteDictionary {
 									String domain) {
 		log.info("'mysql' remote dictionary reload dictionary from domain '{}' dictionary '{}'", domain, dictionaryType);
 		try (Connection connection = this.dataSource.getConnection()) {
-			DomainDictState state = this.getState(connection, domain);
-			log.info("'mysql' remote dictionary domain '{}' state '{}'", domain, state);
-			if (DomainDictState.NEWLY.equals(state)) {
-				// 更新 state
-				String sql = "UPDATE ik_dict_state SET state = ? WHERE domain = ?";
-				final PreparedStatement preparedStatement = connection.prepareStatement(sql);
-				preparedStatement.setString(1, DomainDictState.NON_NEWLY.state);
-				preparedStatement.setString(2, domain);
-				log.info("update ik_dict_state sql '{}'", sql);
-				preparedStatement.execute(sql);
+			final boolean reload = this.resetState(connection, domain);
+			if (reload) {
 				dictionary.reload(dictionaryType);
-				preparedStatement.close();
 			}
 		} catch (SQLException e) {
 			log.error("'mysql' remote dictionary error =>", e);
 		}
+	}
+
+	protected boolean resetState(Connection connection, String domain) throws SQLException {
+		DomainDictState state = this.getState(connection, domain);
+		log.info("'mysql' remote dictionary domain '{}' state '{}'", domain, state);
+		if (!DomainDictState.NEWLY.equals(state)) {
+			return false;
+		}
+		// 更新 state
+		String sql = "UPDATE ik_dict_state SET state = ? WHERE domain = ?";
+		final PreparedStatement preparedStatement = connection.prepareStatement(sql);
+		preparedStatement.setString(1, DomainDictState.NON_NEWLY.state);
+		preparedStatement.setString(2, domain);
+		log.info("update ik_dict_state sql '{}'", sql);
+		preparedStatement.execute();
+		preparedStatement.close();
+		return true;
 	}
 
 	@Override
@@ -98,9 +108,9 @@ public class MySQLRemoteDictionary extends AbstractRemoteDictionary {
 				log.info("'mysql' remote dictionary domain '{}' state '{}'", domain, state);
 				DomainDictState domainState = null;
 				if (DomainDictState.NON_NEWLY.equals(state)) {
-					// update state to non-newly
-					sql = "UPDATE ik_dict_state SET state = ? WHERE domain = '?";
-					domainState = DomainDictState.NON_NEWLY;
+					// update state to newly
+					sql = "UPDATE ik_dict_state SET state = ? WHERE domain = ?";
+					domainState = DomainDictState.NEWLY;
 				}
 				if (DomainDictState.NOT_FOUND.equals(state)) {
 					// insert state to newly
@@ -136,7 +146,7 @@ public class MySQLRemoteDictionary extends AbstractRemoteDictionary {
 			preparedStatement.setString(1, domain);
 			try (final ResultSet resultSet = preparedStatement.executeQuery()) {
 				if (!resultSet.next()) {
-					log.info("Cannot find the `ik_dict_state` and dictionary '{}' data", domain);
+					log.info("Cannot find the `ik_dict_state` for domain '{}' data", domain);
 					return state;
 				}
 				state = DomainDictState.newByState(resultSet.getString("state"));

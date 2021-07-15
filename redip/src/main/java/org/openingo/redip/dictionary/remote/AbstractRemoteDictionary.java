@@ -84,7 +84,6 @@ public abstract class AbstractRemoteDictionary {
 
 	}
 
-
 	/**
 	 * 添加一个主词
 	 * @param domain 业务

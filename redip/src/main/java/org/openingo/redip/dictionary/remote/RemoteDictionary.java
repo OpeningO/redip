@@ -75,10 +75,12 @@ public final class RemoteDictionary {
     public static Set<String> getRemoteWords(IDictionary dictionary,
                                              DictionaryType dictionaryType,
                                              URI domainUri) {
-        checkInitial();
+        //checkInitial();
+        log.info("begin to get remote dictionary words...");
         final AbstractRemoteDictionary remoteDictionary = RemoteDictionary.getRemoteDictionary(domainUri);
         Set<String> remoteWords = Collections.emptySet();
         if (Objects.isNull(remoteDictionary)) {
+            log.info("the remote dictionary for '{}' not found.", domainUri);
             return remoteWords;
         }
         synchronized (RemoteDictionary.class) {
@@ -90,9 +92,11 @@ public final class RemoteDictionary {
     public static void reloadRemoteDictionary(IDictionary dictionary,
                                               DictionaryType dictionaryType,
                                               URI domainUri) {
-        checkInitial();
+        //checkInitial();
+        log.info("begin to reload remote dictionary...");
         final AbstractRemoteDictionary remoteDictionary = RemoteDictionary.getRemoteDictionary(domainUri);
         if (Objects.isNull(remoteDictionary)) {
+            log.info("the remote dictionary for '{}' not found.", domainUri);
             return;
         }
         synchronized (RemoteDictionary.class) {

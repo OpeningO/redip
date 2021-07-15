@@ -44,6 +44,7 @@ public class RedisRemoteDictionary extends AbstractRemoteDictionary {
 		RedisCommands<String, String> sync = this.redisConnection.sync();
 		String key = this.getKey(dictionaryType, domain);
 		List<String> words = sync.lrange(key, 0, -1);
+		this.resetState(dictionaryType, domain);
 		return new HashSet<>(words);
 	}
 
@@ -52,22 +53,30 @@ public class RedisRemoteDictionary extends AbstractRemoteDictionary {
 									DictionaryType dictionaryType,
 									String domain) {
 		log.info("'redis' remote dictionary reload dictionary from domain '{}' dictionary '{}'", domain, dictionaryType);
+		final boolean reload = this.resetState(dictionaryType, domain);
+		if (reload) {
+			dictionary.reload(dictionaryType);
+		}
+	}
+
+	private boolean resetState(DictionaryType dictionaryType, String domain) {
 		RedisCommands<String, String> sync = this.redisConnection.sync();
 		// 当前 对应的 *-state key为true时，进行reload
 		String key = this.getKey(dictionaryType, domain);
 		String state = this.getStateKey(key);
 		String currentState = sync.get(state);
 		final DomainDictState domainDictState = DomainDictState.newByState(currentState);
-		log.info("[Remote Dict File] state '{}' = '{}'", state, currentState);
-		if (DomainDictState.NEWLY.equals(domainDictState)) {
-			sync.set(state, DomainDictState.NON_NEWLY.state);
-			dictionary.reload(dictionaryType);
+		log.info("'redis' remote dictionary state '{}' = '{}' for domain '{}'.", state, currentState, domain);
+		if (!DomainDictState.NEWLY.equals(domainDictState)) {
+			return false;
 		}
+		sync.set(state, DomainDictState.NON_NEWLY.state);
+		return true;
 	}
 
 	@Override
 	protected boolean addWord(DictionaryType dictionaryType, String domain, String word) {
-		log.info("'{}' remote dictionary add new word '{}' for dictionary '{}'", this.etymology(), word, dictionaryType);
+		log.info("'redis' remote dictionary add new word '{}' for dictionary '{}'", word, dictionaryType);
 		RedisCommands<String, String> sync = this.redisConnection.sync();
 		sync.multi();
 		String key = this.getKey(dictionaryType, domain);
