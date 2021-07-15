@@ -75,7 +75,7 @@ public final class RemoteDictionary {
     public static Set<String> getRemoteWords(IDictionary dictionary,
                                              DictionaryType dictionaryType,
                                              URI domainUri) {
-        //checkInitial();
+        checkInitial();
         log.info("begin to get remote dictionary words...");
         final AbstractRemoteDictionary remoteDictionary = RemoteDictionary.getRemoteDictionary(domainUri);
         Set<String> remoteWords = Collections.emptySet();
@@ -92,11 +92,9 @@ public final class RemoteDictionary {
     public static void reloadRemoteDictionary(IDictionary dictionary,
                                               DictionaryType dictionaryType,
                                               URI domainUri) {
-        //checkInitial();
-        log.info("begin to reload remote dictionary...");
+        checkInitial();
         final AbstractRemoteDictionary remoteDictionary = RemoteDictionary.getRemoteDictionary(domainUri);
         if (Objects.isNull(remoteDictionary)) {
-            log.info("the remote dictionary for '{}' not found.", domainUri);
             return;
         }
         synchronized (RemoteDictionary.class) {
@@ -142,7 +140,7 @@ public final class RemoteDictionary {
         log.info("Remote Dictionary etymology '{}'", etymology);
         AbstractRemoteDictionary remoteDictionary = REMOTE_DICTIONARY.get(etymology);
         if (Objects.isNull(remoteDictionary)) {
-            log.error("Load Remote Dictionary Error");
+            log.info("the remote dictionary for '{}' not found.", uri);
         }
         return remoteDictionary;
     }
