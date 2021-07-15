@@ -101,7 +101,7 @@ public class MySQLRemoteDictionary extends AbstractRemoteDictionary {
 				statement.setString(1, word);
 				statement.setInt(2, dictionaryType.getType());
 				statement.setString(3, domain);
-				statement.setDate(4, new Date(new java.util.Date().getTime()));
+				statement.setDate(4, new Date(SystemClockKit.now()));
 				// add word
 				statement.execute();
 				DomainDictState state = this.getState(connection, domain);
