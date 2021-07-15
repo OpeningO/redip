@@ -7,6 +7,7 @@ import org.openingo.redip.dictionary.IDictionary;
 import java.net.URI;
 import java.util.Collections;
 import java.util.Set;
+import java.util.stream.Stream;
 
 /**
  * AbstractRemoteDictionary
@@ -127,4 +128,35 @@ public abstract class AbstractRemoteDictionary {
 	 * @return etymology
 	 */
 	protected abstract String etymology();
+
+	/**
+	 * domain dict state
+	 */
+	protected enum DomainDictState {
+
+		/**
+		 * 存在新词
+		 */
+		NEWLY("newly"),
+
+		/**
+		 * 不存在新词
+		 */
+		NON_NEWLY("non-newly"),
+
+		/**
+		 * 没有找到
+		 */
+		NOT_FOUND("not-found");
+
+		String state;
+
+		DomainDictState(String state) {
+			this.state = state;
+		}
+
+		static DomainDictState newByState(String state) {
+			return Stream.of(values()).filter(s -> s.state.equals(state)).findFirst().orElse(DomainDictState.NOT_FOUND);
+		}
+	}
 }

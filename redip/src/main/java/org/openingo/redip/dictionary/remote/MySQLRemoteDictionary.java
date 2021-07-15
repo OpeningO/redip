@@ -37,24 +37,21 @@ public class MySQLRemoteDictionary extends AbstractRemoteDictionary {
 									  String domain) {
 		log.info("'mysql' remote dictionary get new words from domain '{}' dictionary '{}'", domain, dictionaryType);
 		Set<String> words = new HashSet<>();
-		Connection connection = null;
-		PreparedStatement statement = null;
-		ResultSet resultSet = null;
-		try {
-			connection = this.dataSource.getConnection();
-			statement = connection.prepareStatement("SELECT word FROM ik_words WHERE domain = ? AND word_type = ?");
+		try (Connection connection = this.dataSource.getConnection()) {
+			String sql = "SELECT word FROM ik_words WHERE domain = ? AND word_type = ?";
+			final PreparedStatement statement = connection.prepareStatement(sql);
 			statement.setString(1, domain);
 			statement.setInt(2, dictionaryType.getType());
-			resultSet = statement.executeQuery();
+			final ResultSet resultSet  = statement.executeQuery();
 			while (resultSet.next()) {
 				String word = resultSet.getString("word");
 				words.add(word);
 			}
-			log.info("[Remote DictFile Loading] append {} words.", words.size());
+			log.info("'mysql' remote dictionary append '{}' words.", words.size());
+			statement.close();
+			resultSet.close();
 		} catch (SQLException e) {
-			log.error(" [Remote DictFile Loading] error =>", e);
-		} finally {
-			this.closeResources(connection, statement, resultSet);
+			log.error("'mysql' remote dictionary error =>", e);
 		}
 		return words;
 	}
@@ -64,32 +61,22 @@ public class MySQLRemoteDictionary extends AbstractRemoteDictionary {
 									DictionaryType dictionaryType,
 									String domain) {
 		log.info("'mysql' remote dictionary reload dictionary from domain '{}' dictionary '{}'", domain, dictionaryType);
-		Connection connection = null;
-		PreparedStatement statement = null;
-		ResultSet resultSet = null;
-		try {
-			connection = this.dataSource.getConnection();
-			String sql = "SELECT state FROM ik_dict_state WHERE domain = ? LIMIT 1";
-			statement = connection.prepareStatement(sql);
-			statement.setString(1, domain);
-			resultSet = statement.executeQuery();
-			if (!resultSet.next()) {
-				log.info("Cannot find the `ik_dict_state` and dictionary '{}' data", domain);
-				return;
-			}
-			String state = resultSet.getString("state");
-			log.info("[Remote DictFile] state '{}'", state);
-			if ("true".equals(state)) {
+		try (Connection connection = this.dataSource.getConnection()) {
+			DomainDictState state = this.getState(connection, domain);
+			log.info("'mysql' remote dictionary domain '{}' state '{}'", domain, state);
+			if (DomainDictState.NEWLY.equals(state)) {
 				// 更新 state
-				sql = String.format("UPDATE ik_dict_state SET state = 'false' WHERE domain = '%s'", domain);
+				String sql = "UPDATE ik_dict_state SET state = ? WHERE domain = ?";
+				final PreparedStatement preparedStatement = connection.prepareStatement(sql);
+				preparedStatement.setString(1, DomainDictState.NON_NEWLY.state);
+				preparedStatement.setString(2, domain);
 				log.info("update ik_dict_state sql '{}'", sql);
-				statement.execute(sql);
+				preparedStatement.execute(sql);
 				dictionary.reload(dictionaryType);
+				preparedStatement.close();
 			}
 		} catch (SQLException e) {
-			log.error(" [Remote DictFile Reloading] error =>", e);
-		} finally {
-			this.closeResources(connection, statement, resultSet);
+			log.error("'mysql' remote dictionary error =>", e);
 		}
 	}
 
@@ -100,17 +87,33 @@ public class MySQLRemoteDictionary extends AbstractRemoteDictionary {
 		try (Connection connection = this.dataSource.getConnection()) {
 			connection.setAutoCommit(false);
 			String sql = "INSERT INTO ik_words(word, word_type, domain, create_time) VALUES (?, ?, ?, ?)";
-			try (PreparedStatement statement = connection.prepareStatement(sql)) {
+			try (final PreparedStatement statement = connection.prepareStatement(sql)) {
 				statement.setString(1, word);
 				statement.setInt(2, dictionaryType.getType());
 				statement.setString(3, domain);
 				statement.setDate(4, new Date(SystemClockKit.now()));
 				// add word
 				statement.execute();
-				// todo find state
-				// update state
-				sql = String.format("UPDATE ik_dict_state SET state = 'true' WHERE domain = '%s'", domain);
-				statement.execute(sql);
+				DomainDictState state = this.getState(connection, domain);
+				log.info("'mysql' remote dictionary domain '{}' state '{}'", domain, state);
+				DomainDictState domainState = null;
+				if (DomainDictState.NON_NEWLY.equals(state)) {
+					// update state to non-newly
+					sql = "UPDATE ik_dict_state SET state = ? WHERE domain = '?";
+					domainState = DomainDictState.NON_NEWLY;
+				}
+				if (DomainDictState.NOT_FOUND.equals(state)) {
+					// insert state to newly
+					sql = "INSERT INTO ik_dict_state(state, domain) VALUES(?, ?)";
+					domainState = DomainDictState.NEWLY;
+				}
+				if (Objects.nonNull(domainState)) {
+					PreparedStatement preparedStatement = connection.prepareStatement(sql);
+					preparedStatement.setString(1, domainState.state);
+					preparedStatement.setString(2, domain);
+					preparedStatement.execute();
+					preparedStatement.close();
+				}
 			} catch (SQLException e) {
 				connection.rollback();
 				connection.setAutoCommit(true);
@@ -126,20 +129,23 @@ public class MySQLRemoteDictionary extends AbstractRemoteDictionary {
 		return ret;
 	}
 
-	private void closeResources(Connection connection, Statement statement, ResultSet resultSet) {
-		try {
-			if (Objects.nonNull(connection)) {
-				connection.close();
-			}
-			if (Objects.nonNull(statement)) {
-				statement.close();
-			}
-			if (Objects.nonNull(resultSet)) {
-				resultSet.close();
+	private DomainDictState getState(Connection connection, String domain) {
+		DomainDictState state = DomainDictState.NOT_FOUND;
+		String sql = "SELECT state FROM ik_dict_state WHERE domain = ? LIMIT 1";
+		try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+			preparedStatement.setString(1, domain);
+			try (final ResultSet resultSet = preparedStatement.executeQuery()) {
+				if (!resultSet.next()) {
+					log.info("Cannot find the `ik_dict_state` and dictionary '{}' data", domain);
+					return state;
+				}
+				state = DomainDictState.newByState(resultSet.getString("state"));
 			}
 		} catch (SQLException e) {
-			log.error("[Remote DictFile 'mysql'] closeResources error =>", e);
+			e.printStackTrace();
+			log.error("'{} add get domain '{}' state failure '{}'.", this.etymology(), domain, e);
 		}
+		return state;
 	}
 
 	@Override

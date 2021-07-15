@@ -57,9 +57,10 @@ public class RedisRemoteDictionary extends AbstractRemoteDictionary {
 		String key = this.getKey(dictionaryType, domain);
 		String state = this.getStateKey(key);
 		String currentState = sync.get(state);
+		final DomainDictState domainDictState = DomainDictState.newByState(currentState);
 		log.info("[Remote Dict File] state '{}' = '{}'", state, currentState);
-		if ("true".equals(currentState)) {
-			sync.set(state, "false");
+		if (DomainDictState.NEWLY.equals(domainDictState)) {
+			sync.set(state, DomainDictState.NON_NEWLY.state);
 			dictionary.reload(dictionaryType);
 		}
 	}
@@ -72,7 +73,7 @@ public class RedisRemoteDictionary extends AbstractRemoteDictionary {
 		String key = this.getKey(dictionaryType, domain);
 		sync.lpush(key, word);
 		String state = this.getStateKey(key);
-		sync.set(state, "true");
+		sync.set(state, DomainDictState.NEWLY.state);
 		TransactionResult transactionResult = sync.exec();
 		for (Object txRet : transactionResult) {
 			log.info("txRet '{}'", txRet);
