@@ -7,7 +7,7 @@
     <groupId>org.openingo</groupId>
     <artifactId>redip-parent</artifactId>
     <packaging>pom</packaging>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0</version>
     <name>${artifactId}</name>
     <description>elasticsearch analysis ik remote dictionary word provider</description>
 
@@ -42,8 +42,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
-        <openingo-dependencies.version>1.0.2-SNAPSHOT</openingo-dependencies.version>
-        <logback-classic.version>1.2.3</logback-classic.version>
+        <openingo-dependencies.version>1.0.2</openingo-dependencies.version>
     </properties>
 
     <dependencyManagement>
@@ -54,12 +53,6 @@
                 <version>${openingo-dependencies.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
-            </dependency>
-            <!-- https://mvnrepository.com/artifact/ch.qos.logback/logback-classic -->
-            <dependency>
-                <groupId>ch.qos.logback</groupId>
-                <artifactId>logback-classic</artifactId>
-                <version>${logback-classic.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.openingo.kits</groupId>

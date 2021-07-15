@@ -16,8 +16,8 @@ import java.util.Map;
  */
 public class RemoteDictionaryConfiguration implements ApplicationContextAware {
 
-	public RemoteDictionaryConfiguration(RedipConfigurationProperties properties) {
-		RemoteDictionary.initial(properties, false);
+	public RemoteDictionaryConfiguration() {
+		RemoteDictionary.initial();
 	}
 
 	@Override

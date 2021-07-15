@@ -6,8 +6,7 @@ import io.lettuce.core.TransactionResult;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.sync.RedisCommands;
 import lombok.extern.slf4j.Slf4j;
-import org.openingo.redip.configuration.RedipBaseConfigurationProperties;
-import org.openingo.redip.configuration.RedipConfigurationProperties;
+import org.openingo.redip.configuration.RemoteConfiguration;
 import org.openingo.redip.constants.DictionaryType;
 import org.openingo.redip.constants.RemoteDictionaryEtymology;
 import org.openingo.redip.dictionary.IDictionary;
@@ -30,14 +29,13 @@ public class RedisRemoteDictionary extends AbstractRemoteDictionary {
 
 	private final static String KEY_PREFIX = "es-ik-words";
 
-	public RedisRemoteDictionary(RedipBaseConfigurationProperties properties) {
-		super(properties);
+	public RedisRemoteDictionary(RemoteConfiguration remoteConfiguration) {
+		super(remoteConfiguration);
 		this.redisConnection = this.getRedisConnection();
 	}
 
 	@Override
-	public Set<String> getRemoteWords(IDictionary dictionary,
-									  DictionaryType dictionaryType,
+	public Set<String> getRemoteWords(DictionaryType dictionaryType,
 									  String etymology,
 									  String domain) {
 		log.info("'redis' remote dictionary get new words from domain '{}' dictionary '{}'", domain, dictionaryType);
@@ -75,19 +73,19 @@ public class RedisRemoteDictionary extends AbstractRemoteDictionary {
 	}
 
 	@Override
-	protected boolean addWord(DictionaryType dictionaryType, String domain, String word) {
-		log.info("'redis' remote dictionary add new word '{}' for dictionary '{}'", word, dictionaryType);
+	protected boolean addWord(DictionaryType dictionaryType, String domain, String... words) {
+		log.info("'redis' remote dictionary add new word '{}' for dictionary '{}'", words, dictionaryType);
 		RedisCommands<String, String> sync = this.redisConnection.sync();
 		sync.multi();
 		String key = this.getKey(dictionaryType, domain);
-		sync.lpush(key, word);
+		sync.lpush(key, words);
 		String state = this.getStateKey(key);
 		sync.set(state, DomainDictState.NEWLY.state);
 		TransactionResult transactionResult = sync.exec();
 		for (Object txRet : transactionResult) {
 			log.info("txRet '{}'", txRet);
 		}
-		log.info("'{} add new word '{}' success.", this.etymology(), word);
+		log.info("'{} add new word '{}' success.", this.etymology(), words);
 		return true;
 	}
 
@@ -115,7 +113,7 @@ public class RedisRemoteDictionary extends AbstractRemoteDictionary {
 	}
 
 	private StatefulRedisConnection<String, String> getRedisConnection() {
-		RedipConfigurationProperties.Redis redis = this.getRemote().getRedis();
+		RemoteConfiguration.Redis redis = this.remoteConfiguration.getRedis();
 		RedisURI.Builder builder = RedisURI.builder()
 				.withHost(redis.getHost())
 				.withPort(redis.getPort())

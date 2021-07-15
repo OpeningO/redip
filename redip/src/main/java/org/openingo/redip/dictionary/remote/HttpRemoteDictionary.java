@@ -12,7 +12,7 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpHead;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.openingo.redip.configuration.RedipBaseConfigurationProperties;
+import org.openingo.redip.configuration.RemoteConfiguration;
 import org.openingo.redip.constants.DictionaryType;
 import org.openingo.redip.constants.RemoteDictionaryEtymology;
 import org.openingo.redip.dictionary.IDictionary;
@@ -45,12 +45,12 @@ class HttpRemoteDictionary extends AbstractRemoteDictionary {
 
     private static final Map<String, Modifier> MODIFIER_MAPPING = new ConcurrentHashMap<>();
 
-    public HttpRemoteDictionary(RedipBaseConfigurationProperties properties) {
-        super(properties);
+    public HttpRemoteDictionary(RemoteConfiguration remoteConfiguration) {
+        super(remoteConfiguration);
     }
 
     @Override
-    protected boolean addWord(DictionaryType dictionaryType, String domain, String word) {
+    protected boolean addWord(DictionaryType dictionaryType, String domain, String... words) {
         log.info("'{}' remote dictionary add new word 'not support", this.etymology());
         return false;
     }
@@ -61,8 +61,7 @@ class HttpRemoteDictionary extends AbstractRemoteDictionary {
     }
 
     @Override
-    public Set<String> getRemoteWords(IDictionary dictionary,
-                                      DictionaryType dictionaryType,
+    public Set<String> getRemoteWords(DictionaryType dictionaryType,
                                       URI domainUri) {
         log.info("'http' remote dictionary get new words from domain '{}' dictionary '{}'", domainUri, dictionaryType);
         Set<String> words = new HashSet<>();
@@ -182,7 +181,7 @@ class HttpRemoteDictionary extends AbstractRemoteDictionary {
     }
 
     private String getLocation(DictionaryType dictionaryType, URI domainUri) {
-        RedipBaseConfigurationProperties.Http http = this.getRemote().getHttp();
+        RemoteConfiguration.Http http = this.remoteConfiguration.http();
         // path: ${base}/es-dict/${main}/{domain}
         // or path: ${base}/es-dict/${stop}/{domain}
         return String.format("%s/es-dict/%s/%s", http.getBase(), dictionaryType.getDictName(), domainUri.getAuthority());

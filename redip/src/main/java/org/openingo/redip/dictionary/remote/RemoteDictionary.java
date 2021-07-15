@@ -2,7 +2,7 @@ package org.openingo.redip.dictionary.remote;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.http.util.Asserts;
-import org.openingo.redip.configuration.RedipBaseConfigurationProperties;
+import org.openingo.redip.configuration.RedipConfigurationProperties;
 import org.openingo.redip.constants.DictionaryType;
 import org.openingo.redip.constants.RemoteDictionaryEtymology;
 import org.openingo.redip.dictionary.IDictionary;
@@ -34,30 +34,26 @@ public final class RemoteDictionary {
     }
 
     /**
-     * 默认初始化词典实例
+     * 初始化词典实例
      * @param properties 配置信息
      */
-    public static void initial(RedipBaseConfigurationProperties properties) {
-        initial(properties, true);
+    public static void initial(RedipConfigurationProperties properties) {
+        RedipConfigurationProperties.Remote remoteConfiguration = properties.getRemote();
+        initial();
+        addRemoteDictionary(new HttpRemoteDictionary(remoteConfiguration));
+        addRemoteDictionary(new RedisRemoteDictionary(remoteConfiguration));
+        addRemoteDictionary(new MySQLRemoteDictionary(remoteConfiguration));
+        log.info("Remote Dictionary Initialed");
     }
 
     /**
-     * 默认初始化词典实例
-     * @param properties 配置信息
-     * @param initDictionaryInstance 是否初始化词典实例
+     * 初始化词典实例
      */
-    public static void initial(RedipBaseConfigurationProperties properties,
-                               boolean initDictionaryInstance) {
+    public static void initial() {
         if (Objects.isNull(remoteDictionaryHandler)) {
             synchronized (RemoteDictionary.class) {
                 if (Objects.isNull(remoteDictionaryHandler)) {
                     remoteDictionaryHandler = new RemoteDictionary();
-                    if (initDictionaryInstance) {
-                        addRemoteDictionary(new HttpRemoteDictionary(properties));
-                        addRemoteDictionary(new RedisRemoteDictionary(properties));
-                        addRemoteDictionary(new MySQLRemoteDictionary(properties));
-                    }
-                    log.info("Remote Dictionary Initialed");
                 }
             }
         }
@@ -72,8 +68,7 @@ public final class RemoteDictionary {
         log.info("The Remote Dictionary For etymology '{}' is loaded!", etymology);
     }
 
-    public static Set<String> getRemoteWords(IDictionary dictionary,
-                                             DictionaryType dictionaryType,
+    public static Set<String> getRemoteWords(DictionaryType dictionaryType,
                                              URI domainUri) {
         checkInitial();
         log.info("begin to get remote dictionary words...");
@@ -84,9 +79,15 @@ public final class RemoteDictionary {
             return remoteWords;
         }
         synchronized (RemoteDictionary.class) {
-            remoteWords = AccessController.doPrivileged((PrivilegedAction<Set<String>>) () -> remoteDictionary.getRemoteWords(dictionary, dictionaryType, domainUri));
+            remoteWords = AccessController.doPrivileged((PrivilegedAction<Set<String>>) () -> remoteDictionary.getRemoteWords(dictionaryType, domainUri));
             return StringHelper.filterBlank(remoteWords);
         }
+    }
+
+    public static Set<String> getRemoteWords(RemoteDictionaryEtymology etymology,
+                                             DictionaryType dictionaryType,
+                                             String domain) {
+        return getRemoteWords(dictionaryType, URI.create(String.format("%s://%s", etymology.getEtymology(), domain)));
     }
 
     public static void reloadRemoteDictionary(IDictionary dictionary,
@@ -107,19 +108,19 @@ public final class RemoteDictionary {
 
     public static boolean addWord(DictionaryType dictionaryType,
                                   URI domainUri,
-                                  String word) {
+                                  String... words) {
         RemoteDictionaryEtymology etymology = RemoteDictionaryEtymology.newEtymology(domainUri.getScheme());
-        return RemoteDictionary.addWord(etymology, dictionaryType, domainUri.getAuthority(), word);
+        return RemoteDictionary.addWord(etymology, dictionaryType, domainUri.getAuthority(), words);
     }
 
     public static boolean addWord(RemoteDictionaryEtymology etymology,
                                   DictionaryType dictionaryType,
                                   String domain,
-                                  String word) {
+                                  String... words) {
         checkInitial();
         final AbstractRemoteDictionary dictionary = REMOTE_DICTIONARY.get(etymology.getEtymology());
         synchronized (RemoteDictionary.class) {
-            return dictionary.addWord(dictionaryType, domain, word);
+            return dictionary.addWord(dictionaryType, domain, words);
         }
     }
 

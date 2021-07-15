@@ -1,6 +1,7 @@
 package org.openingo.redip.dictionary.remote;
 
-import org.openingo.redip.configuration.RedipBaseConfigurationProperties;
+import org.openingo.jdkits.validate.AssertKit;
+import org.openingo.redip.configuration.RemoteConfiguration;
 import org.openingo.redip.constants.DictionaryType;
 import org.openingo.redip.dictionary.IDictionary;
 
@@ -17,42 +18,33 @@ import java.util.stream.Stream;
  */
 public abstract class AbstractRemoteDictionary {
 
-	private final RedipBaseConfigurationProperties properties;
+	protected final RemoteConfiguration remoteConfiguration;
 
-	AbstractRemoteDictionary(RedipBaseConfigurationProperties properties) {
-		this.properties = properties;
-	}
-
-	RedipBaseConfigurationProperties.Remote getRemote() {
-		return this.properties.getRemote();
+	AbstractRemoteDictionary(RemoteConfiguration remoteConfiguration) {
+		this.remoteConfiguration = remoteConfiguration;
 	}
 
 	/**
 	 * 获取远程词库
-	 * @param dictionary 词典
 	 * @param dictionaryType 词典类型
 	 * @param domainUri 领域词源Uri
 	 * @return words
 	 */
-	public Set<String> getRemoteWords(IDictionary dictionary,
-									  DictionaryType dictionaryType,
+	public Set<String> getRemoteWords(DictionaryType dictionaryType,
 									  URI domainUri) {
-		return this.getRemoteWords(dictionary,
-				dictionaryType,
+		return this.getRemoteWords(dictionaryType,
 				domainUri.getScheme(),
 				domainUri.getAuthority());
 	}
 
 	/**
 	 * 获取远程词库
-	 * @param dictionary 词典
 	 * @param dictionaryType 词典类型
 	 * @param etymology 词源
 	 * @param domain 领域
 	 * @return words
 	 */
-	public Set<String> getRemoteWords(IDictionary dictionary,
-									  DictionaryType dictionaryType,
+	public Set<String> getRemoteWords(DictionaryType dictionaryType,
 									  String etymology,
 									  String domain) {
 		return Collections.emptySet();
@@ -85,37 +77,48 @@ public abstract class AbstractRemoteDictionary {
 	}
 
 	/**
-	 * 添加一个主词
+	 * 添加主词
 	 * @param domain 业务
-	 * @param word 新词
+	 * @param words 新词
 	 * @return true成功
 	 */
-	public boolean addMainWord(String domain, String word) {
+	public boolean addMainWord(String domain, String... words) {
 		synchronized (this) {
-			return addWord(DictionaryType.MAIN_WORDS, domain, word);
+			return processAddingWords(DictionaryType.MAIN_WORDS, domain, words);
 		}
 	}
 
 	/**
-	 * 添加一个stop词
+	 * 添加stop词
 	 * @param domain 业务
-	 * @param word 新词
+	 * @param words 新词
 	 * @return true成功
 	 */
-	public boolean addStopWord(String domain, String word) {
+	public boolean addStopWord(String domain, String... words) {
 		synchronized (this) {
-			return addWord(DictionaryType.STOP_WORDS, domain, word);
+			return processAddingWords(DictionaryType.STOP_WORDS, domain, words);
 		}
 	}
 
 	/**
-	 * 添加一个新词
+	 * 处理添加新词
 	 * @param dictionaryType 词典类型
 	 * @param domain 业务
-	 * @param word 新词
+	 * @param words 新词
 	 * @return true成功
 	 */
-	protected abstract boolean addWord(DictionaryType dictionaryType, String domain, String word);
+	private boolean processAddingWords(DictionaryType dictionaryType, String domain, String... words) {
+		AssertKit.notEmpty(words, "the words is 'null' or 'empty'.");
+		return this.addWord(dictionaryType, domain, words);
+	}
+	/**
+	 * 添加新词
+	 * @param dictionaryType 词典类型
+	 * @param domain 业务
+	 * @param words 新词
+	 * @return true成功
+	 */
+	protected abstract boolean addWord(DictionaryType dictionaryType, String domain, String... words);
 
 	/**
 	 * close resources

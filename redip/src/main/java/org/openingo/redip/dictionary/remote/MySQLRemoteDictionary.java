@@ -3,8 +3,7 @@ package org.openingo.redip.dictionary.remote;
 import com.zaxxer.hikari.HikariDataSource;
 import lombok.extern.slf4j.Slf4j;
 import org.openingo.jdkits.sys.SystemClockKit;
-import org.openingo.redip.configuration.RedipBaseConfigurationProperties;
-import org.openingo.redip.configuration.RedipConfigurationProperties;
+import org.openingo.redip.configuration.RemoteConfiguration;
 import org.openingo.redip.constants.DictionaryType;
 import org.openingo.redip.constants.RemoteDictionaryEtymology;
 import org.openingo.redip.dictionary.IDictionary;
@@ -25,14 +24,13 @@ public class MySQLRemoteDictionary extends AbstractRemoteDictionary {
 
 	private final HikariDataSource dataSource;
 
-	public MySQLRemoteDictionary(RedipBaseConfigurationProperties properties) {
-		super(properties);
+	public MySQLRemoteDictionary(RemoteConfiguration remoteConfiguration) {
+		super(remoteConfiguration);
 		this.dataSource = this.initDataSource();
 	}
 
 	@Override
-	public Set<String> getRemoteWords(IDictionary dictionary,
-									  DictionaryType dictionaryType,
+	public Set<String> getRemoteWords(DictionaryType dictionaryType,
 									  String etymology,
 									  String domain) {
 		log.info("'mysql' remote dictionary get new words from domain '{}' dictionary '{}'", domain, dictionaryType);
@@ -91,19 +89,24 @@ public class MySQLRemoteDictionary extends AbstractRemoteDictionary {
 	}
 
 	@Override
-	protected boolean addWord(DictionaryType dictionaryType, String domain, String word) {
-		log.info("'{}' remote dictionary add new word '{}' for dictionary '{}'", this.etymology(), word, dictionaryType);
+	protected boolean addWord(DictionaryType dictionaryType, String domain, String... words) {
+		log.info("'{}' remote dictionary add new word '{}' for dictionary '{}'", this.etymology(), words, dictionaryType);
 		boolean ret = true;
 		try (Connection connection = this.dataSource.getConnection()) {
 			connection.setAutoCommit(false);
 			String sql = "INSERT INTO ik_words(word, word_type, domain, create_time) VALUES (?, ?, ?, ?)";
 			try (final PreparedStatement statement = connection.prepareStatement(sql)) {
-				statement.setString(1, word);
-				statement.setInt(2, dictionaryType.getType());
-				statement.setString(3, domain);
-				statement.setDate(4, new Date(SystemClockKit.now()));
+				Date date = new Date(SystemClockKit.now());
+				Integer dictionaryTypeType = dictionaryType.getType();
+				for (String word : words) {
+					statement.setString(1, word);
+					statement.setInt(2, dictionaryTypeType);
+					statement.setString(3, domain);
+					statement.setDate(4, date);
+					statement.addBatch();
+				}
 				// add word
-				statement.execute();
+				statement.executeBatch();
 				DomainDictState state = this.getState(connection, domain);
 				log.info("'mysql' remote dictionary domain '{}' state '{}'", domain, state);
 				DomainDictState domainState = null;
@@ -133,7 +136,7 @@ public class MySQLRemoteDictionary extends AbstractRemoteDictionary {
 			connection.setAutoCommit(true);
 		} catch (SQLException e) {
 			e.printStackTrace();
-			log.error("'{} add new word '{}' failure '{}'.", this.etymology(), word, e);
+			log.error("'{} add new word '{}' failure '{}'.", this.etymology(), words, e);
 			ret = false;
 		}
 		return ret;
@@ -173,7 +176,7 @@ public class MySQLRemoteDictionary extends AbstractRemoteDictionary {
 
 	private HikariDataSource initDataSource() {
 		HikariDataSource dataSource = new HikariDataSource();
-		RedipConfigurationProperties.MySQL mysql = this.getRemote().getMysql();
+		RemoteConfiguration.MySQL mysql = this.remoteConfiguration.getMysql();
 		dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
 		dataSource.setJdbcUrl(mysql.getUrl());
 		dataSource.setUsername(mysql.getUsername());

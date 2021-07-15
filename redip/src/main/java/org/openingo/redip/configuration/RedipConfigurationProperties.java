@@ -13,18 +13,18 @@ import java.util.List;
  * @since 2021/7/14 18:32
  */
 @Data
-public class RedipConfigurationProperties extends RedipBaseConfigurationProperties {
+public class RedipConfigurationProperties {
 
 	/**
 	 * 扩展词库
 	 */
 	Dict dict = new Dict();
 
-	public final List<String> getMainExtDictFiles() {
+	public final List<String> getLocalMainExtDictFiles() {
 		return StringHelper.filterBlank(dict.local.main);
 	}
 
-	public final List<String> getExtStopDictFiles() {
+	public final List<String> getLocalStopExtDictFiles() {
 		return StringHelper.filterBlank(dict.local.stop);
 	}
 
@@ -32,7 +32,6 @@ public class RedipConfigurationProperties extends RedipBaseConfigurationProperti
 		return this.dict.remote.getRefresh();
 	}
 
-	@Override
 	public Remote getRemote() {
 		return this.dict.remote;
 	}
@@ -66,5 +65,30 @@ public class RedipConfigurationProperties extends RedipBaseConfigurationProperti
 		 * stop词典文件
 		 */
 		List<String> stop = Collections.emptyList();
+	}
+
+	@Data
+	public static class Remote extends RemoteConfiguration {
+
+		@Override
+		public Http http() {
+			return http;
+		}
+
+		/**
+		 * http 配置
+		 */
+		Http http = new Http();
+
+		Remote.Refresh refresh = new Remote.Refresh();
+
+		/**
+		 * 默认延迟10s，周期60s
+		 */
+		@Data
+		public static class Refresh {
+			Integer delay = 10;
+			Integer period = 60;
+		}
 	}
 }
