@@ -94,15 +94,13 @@ public class MySQLRemoteDictionary extends AbstractRemoteDictionary {
 		boolean ret = true;
 		try (Connection connection = this.dataSource.getConnection()) {
 			connection.setAutoCommit(false);
-			String sql = "INSERT INTO ik_words(word, word_type, domain, create_time) VALUES (?, ?, ?, ?)";
+			String sql = "INSERT INTO ik_words(word, word_type, domain) VALUES (?, ?, ?)";
 			try (final PreparedStatement statement = connection.prepareStatement(sql)) {
-				Date date = new Date(SystemClockKit.now());
 				Integer dictionaryTypeType = dictionaryType.getType();
 				for (String word : words) {
 					statement.setString(1, word);
 					statement.setInt(2, dictionaryTypeType);
 					statement.setString(3, domain);
-					statement.setDate(4, date);
 					statement.addBatch();
 				}
 				// add word
