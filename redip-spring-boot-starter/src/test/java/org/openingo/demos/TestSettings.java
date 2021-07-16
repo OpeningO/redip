@@ -27,14 +27,26 @@ public class TestSettings {
 		System.out.println(map);
 	}
 
-	public static void main(String[] args) {
+	private void initRemoteDictionary() {
 		Yaml yaml = new Yaml(new CustomClassLoaderConstructor(RedipConfigurationProperties.class, TestSettings.class.getClassLoader()));
 		InputStream resourceAsStream = TestSettings.class.getClassLoader().getResourceAsStream("ikanalyzer.yml");
 		RedipConfigurationProperties properties = yaml.loadAs(resourceAsStream, RedipConfigurationProperties.class);
 		RemoteDictionary.initial(properties);
+	}
 
+	@Test
+	public void addMySQLWords() {
+		this.initRemoteDictionary();
 		RemoteDictionary.addWord(RemoteDictionaryEtymology.MYSQL, DictionaryType.MAIN_WORDS, "user", "new words");
 		Set<String> userWords = RemoteDictionary.getRemoteWords(RemoteDictionaryEtymology.MYSQL, DictionaryType.MAIN_WORDS, "user");
+		System.out.println(userWords);
+	}
+
+	@Test
+	public void addRedisWords() {
+		this.initRemoteDictionary();
+		RemoteDictionary.addWord(RemoteDictionaryEtymology.REDIS, DictionaryType.MAIN_WORDS, "user", "new words", "word2", "word3");
+		Set<String> userWords = RemoteDictionary.getRemoteWords(RemoteDictionaryEtymology.REDIS, DictionaryType.MAIN_WORDS, "user");
 		System.out.println(userWords);
 	}
 }

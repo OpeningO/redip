@@ -2,19 +2,18 @@ package org.openingo.redip.dictionary.remote;
 
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
+import io.lettuce.core.ScoredValue;
 import io.lettuce.core.TransactionResult;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.sync.RedisCommands;
 import lombok.extern.slf4j.Slf4j;
+import org.openingo.jdkits.sys.SystemClockKit;
 import org.openingo.redip.configuration.RemoteConfiguration;
 import org.openingo.redip.constants.DictionaryType;
 import org.openingo.redip.constants.RemoteDictionaryEtymology;
 import org.openingo.redip.dictionary.IDictionary;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 /**
  * RedisRemoteDictionary
@@ -41,7 +40,7 @@ public class RedisRemoteDictionary extends AbstractRemoteDictionary {
 		log.info("'redis' remote dictionary get new words from domain '{}' dictionary '{}'", domain, dictionaryType);
 		RedisCommands<String, String> sync = this.redisConnection.sync();
 		String key = this.getKey(dictionaryType, domain);
-		List<String> words = sync.lrange(key, 0, -1);
+		List<String> words = sync.zrange(key, 0, -1);
 		this.resetState(dictionaryType, domain);
 		return new HashSet<>(words);
 	}
@@ -78,7 +77,11 @@ public class RedisRemoteDictionary extends AbstractRemoteDictionary {
 		RedisCommands<String, String> sync = this.redisConnection.sync();
 		sync.multi();
 		String key = this.getKey(dictionaryType, domain);
-		sync.lpush(key, words);
+		List<ScoredValue<String>> scoresAndValues = new ArrayList<>(words.length * 2);
+		for (int i = 0; i < words.length; i++) {
+			scoresAndValues.add(ScoredValue.just(SystemClockKit.now()*1.0 + i, words[i]));
+		}
+		sync.zadd(key, scoresAndValues.toArray());
 		String state = this.getStateKey(key);
 		sync.set(state, DomainDictState.NEWLY.state);
 		TransactionResult transactionResult = sync.exec();
