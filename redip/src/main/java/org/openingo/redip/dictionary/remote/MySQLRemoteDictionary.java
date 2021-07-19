@@ -161,6 +161,10 @@ public class MySQLRemoteDictionary extends AbstractRemoteDictionary {
 
 	@Override
 	protected void closeResource() {
+		if (Objects.isNull(this.dataSource)) {
+			return;
+		}
+
 		String etymology = this.etymology();
 		log.info("'{}' remote dictionary is closing...", etymology);
 		this.dataSource.close();
