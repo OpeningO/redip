@@ -94,7 +94,7 @@ public class RedisRemoteDictionary extends AbstractRemoteDictionary {
 
 	@Override
 	protected void closeResource() {
-		if (Objects.isNull(this.redisConnection)) {
+		if (Objects.isNull(this.redisConnection) || !this.redisConnection.isOpen()) {
 			return;
 		}
 		String etymology = this.etymology();

@@ -161,7 +161,7 @@ public class MySQLRemoteDictionary extends AbstractRemoteDictionary {
 
 	@Override
 	protected void closeResource() {
-		if (Objects.isNull(this.dataSource)) {
+		if (Objects.isNull(this.dataSource) || this.dataSource.isClosed()) {
 			return;
 		}
 
