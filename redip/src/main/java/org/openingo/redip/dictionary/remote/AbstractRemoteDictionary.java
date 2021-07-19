@@ -16,13 +16,13 @@ import java.util.stream.Stream;
  * @author Qicz
  * @since 2021/7/14 18:49
  */
-public abstract class AbstractRemoteDictionary implements Runnable {
+public abstract class AbstractRemoteDictionary {
 
 	protected final RemoteConfiguration remoteConfiguration;
 
 	AbstractRemoteDictionary(RemoteConfiguration remoteConfiguration) {
 		this.remoteConfiguration = remoteConfiguration;
-		Runtime.getRuntime().addShutdownHook(new Thread(this));
+		Runtime.getRuntime().addShutdownHook(new Thread(this::closeResource));
 	}
 
 	/**
@@ -161,10 +161,5 @@ public abstract class AbstractRemoteDictionary implements Runnable {
 		static DomainDictState newByState(String state) {
 			return Stream.of(values()).filter(s -> s.state.equals(state)).findFirst().orElse(DomainDictState.NOT_FOUND);
 		}
-	}
-
-	@Override
-	public void run() {
-		this.closeResource();
 	}
 }
