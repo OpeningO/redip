@@ -106,7 +106,7 @@ public class RedisRemoteDictionary extends AbstractRemoteDictionary {
 		String key = this.getKey(dictionaryType, domain);
 		List<ScoredValue<String>> scoresAndValues = new ArrayList<>(words.length * 2);
 		for (int i = 0; i < words.length; i++) {
-			scoresAndValues.add(ScoredValue.just(SystemClockKit.now()*1.0 + i, words[i]));
+			scoresAndValues.add(ScoredValue.just(SystemClockKit.now() * 1.0 + i, words[i]));
 		}
 		sync.zadd(key, scoresAndValues.toArray());
 		String state = this.getStateKey(key);
