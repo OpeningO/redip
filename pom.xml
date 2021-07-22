@@ -34,7 +34,7 @@
     <groupId>org.openingo</groupId>
     <artifactId>redip-parent</artifactId>
     <packaging>pom</packaging>
-    <version>1.0.3</version>
+    <version>1.0.4</version>
     <name>${artifactId}</name>
     <description>elasticsearch analysis ik remote dictionary word provider</description>
 

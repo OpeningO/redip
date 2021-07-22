@@ -39,6 +39,8 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpHead;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
+import org.openingo.jdkits.lang.StrKit;
 import org.openingo.redip.configuration.RemoteConfiguration;
 import org.openingo.redip.constants.DictionaryType;
 import org.openingo.redip.constants.RemoteDictionaryEtymology;
@@ -48,10 +50,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -90,11 +89,10 @@ class HttpRemoteDictionary extends AbstractRemoteDictionary {
     @Override
     public Set<String> getRemoteWords(DictionaryType dictionaryType,
                                       URI domainUri) {
-        log.info("'http' remote dictionary get new words from domain '{}' dictionary '{}'", domainUri, dictionaryType);
+        String location = this.getLocation(dictionaryType, domainUri);
+        log.info("'http' remote dictionary get new words from domain '{}' dictionary '{}' location '{}'", domainUri, dictionaryType, location);
         Set<String> words = new HashSet<>();
         CloseableHttpResponse response;
-        BufferedReader in;
-        String location = this.getLocation(dictionaryType, domainUri);
         HttpGet get = new HttpGet(location);
         get.setConfig(REQUEST_CONFIG);
         try {
@@ -112,15 +110,9 @@ class HttpRemoteDictionary extends AbstractRemoteDictionary {
                         }
                     }
 
-                    if (entity.getContentLength() > 0 || entity.isChunked()) {
-                        in = new BufferedReader(new InputStreamReader(entity.getContent(), charset));
-                        String line;
-                        while ((line = in.readLine()) != null) {
-                            words.add(line);
-                        }
-                        in.close();
-                        response.close();
-                        return words;
+                    String string = EntityUtils.toString(entity, charset);
+                    if(StrKit.notBlank(string)) {
+                        words.addAll(Arrays.asList(string.split("\n|\r\n")));
                     }
                 }
             }
@@ -142,8 +134,8 @@ class HttpRemoteDictionary extends AbstractRemoteDictionary {
     protected void reloadDictionary(IDictionary dictionary,
                                     DictionaryType dictionaryType,
                                     URI domainUri) {
-        log.info("'http' remote dictionary reload dictionary from domain '{}' dictionary '{}'", domainUri, dictionaryType);
         String location = this.getLocation(dictionaryType, domainUri);
+        log.info("'http' remote dictionary reload dictionary from domain '{}' dictionary '{}' location '{}'", domainUri, dictionaryType, location);
         HttpHead head = new HttpHead(location);
         head.setConfig(REQUEST_CONFIG);
         // 上次更改时间
@@ -208,6 +200,11 @@ class HttpRemoteDictionary extends AbstractRemoteDictionary {
     }
 
     private String getLocation(DictionaryType dictionaryType, URI domainUri) {
+        final String schemeSpecificPart = domainUri.getSchemeSpecificPart();
+        if (schemeSpecificPart.startsWith("http")
+                || schemeSpecificPart.startsWith("https")) {
+            return schemeSpecificPart;
+        }
         RemoteConfiguration.Http http = this.remoteConfiguration.http();
         // path: ${base}/es-dict/${main}/{domain}
         // or path: ${base}/es-dict/${stop}/{domain}

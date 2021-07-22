@@ -29,7 +29,9 @@ package org.openingo.redip.dictionary.remote;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.http.util.Asserts;
+import org.openingo.jdkits.lang.StrKit;
 import org.openingo.redip.configuration.RedipConfigurationProperties;
+import org.openingo.redip.configuration.RemoteConfiguration;
 import org.openingo.redip.constants.DictionaryType;
 import org.openingo.redip.constants.RemoteDictionaryEtymology;
 import org.openingo.redip.dictionary.IDictionary;
@@ -65,11 +67,20 @@ public final class RemoteDictionary {
      * @param properties 配置信息
      */
     public static void initial(RedipConfigurationProperties properties) {
-        RedipConfigurationProperties.Remote remoteConfiguration = properties.getRemote();
         initial();
-        addRemoteDictionary(new HttpRemoteDictionary(remoteConfiguration));
-        addRemoteDictionary(new RedisRemoteDictionary(remoteConfiguration));
-        addRemoteDictionary(new MySQLRemoteDictionary(remoteConfiguration));
+        RedipConfigurationProperties.Remote remoteConfiguration = properties.getRemote();
+        final RemoteConfiguration.Http http = remoteConfiguration.getHttp();
+        if (Objects.nonNull(http) && StrKit.notBlank(http.getBase())) {
+            addRemoteDictionary(new HttpRemoteDictionary(remoteConfiguration));
+        }
+        final RemoteConfiguration.Redis redis = remoteConfiguration.getRedis();
+        if (Objects.nonNull(redis) && StrKit.notBlank(redis.getHost())) {
+            addRemoteDictionary(new RedisRemoteDictionary(remoteConfiguration));
+        }
+        final RemoteConfiguration.MySQL mysql = remoteConfiguration.getMysql();
+        if (Objects.nonNull(mysql) && StrKit.notBlank(mysql.getUrl())) {
+            addRemoteDictionary(new MySQLRemoteDictionary(remoteConfiguration));
+        }
         log.info("Remote Dictionary Initialed");
     }
 

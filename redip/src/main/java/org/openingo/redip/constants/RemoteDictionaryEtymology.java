@@ -45,7 +45,7 @@ public enum RemoteDictionaryEtymology {
 	HTTP("http"),
 	REDIS("redis"),
 	MYSQL("mysql"),
-	DEFAULT(REDIS.etymology);
+	DEFAULT(HTTP.etymology);
 
 	String etymology;
 
@@ -54,7 +54,6 @@ public enum RemoteDictionaryEtymology {
 	}
 
 	public static RemoteDictionaryEtymology newEtymology(String etymology) {
-		return Stream.of(values()).filter(e -> e.etymology.equals(etymology)).findFirst().orElse(null
-		);
+		return Stream.of(values()).filter(e -> e.etymology.equals(etymology)).findFirst().orElse(null);
 	}
 }

@@ -31,7 +31,9 @@ import lombok.Data;
 import org.openingo.redip.helper.StringHelper;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * RedipConfigurationProperties
@@ -47,12 +49,12 @@ public class RedipConfigurationProperties {
 	 */
 	Dict dict = new Dict();
 
-	public final List<String> getLocalMainExtDictFiles() {
-		return StringHelper.filterBlank(dict.local.main);
+	public final Set<String> getLocalMainExtDictFiles() {
+		return new HashSet<>(StringHelper.filterBlank(dict.local.main));
 	}
 
-	public final List<String> getLocalStopExtDictFiles() {
-		return StringHelper.filterBlank(dict.local.stop);
+	public final Set<String> getLocalStopExtDictFiles() {
+		return new HashSet<>(StringHelper.filterBlank(dict.local.stop));
 	}
 
 	public final Remote.Refresh getRemoteRefresh() {
