@@ -157,8 +157,10 @@ public class RedisRemoteDictionary extends AbstractRemoteDictionary {
 
 	private <T> T getCommands() {
 		if (Objects.nonNull(this.redisClusterConnection)) {
+			log.info("using cluster connection");
 			return (T)this.redisClusterConnection.sync();
 		}
+		log.info("using standalone connection");
 		return (T)this.redisConnection.sync();
 	}
 
