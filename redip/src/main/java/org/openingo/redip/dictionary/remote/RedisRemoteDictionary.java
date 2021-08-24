@@ -31,10 +31,17 @@ import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
 import io.lettuce.core.ScoredValue;
 import io.lettuce.core.TransactionResult;
+import io.lettuce.core.api.StatefulConnection;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.sync.RedisCommands;
+import io.lettuce.core.api.sync.RedisSortedSetCommands;
+import io.lettuce.core.api.sync.RedisStreamCommands;
+import io.lettuce.core.api.sync.RedisStringCommands;
+import io.lettuce.core.cluster.RedisClusterClient;
+import io.lettuce.core.cluster.api.StatefulRedisClusterConnection;
 import lombok.extern.slf4j.Slf4j;
 import org.openingo.jdkits.sys.SystemClockKit;
+import org.openingo.jdkits.validate.ValidateKit;
 import org.openingo.redip.configuration.RemoteConfiguration;
 import org.openingo.redip.constants.DictionaryType;
 import org.openingo.redip.constants.RemoteDictionaryEtymology;
@@ -49,15 +56,19 @@ import java.util.*;
  * @since 2021/7/14 18:49
  */
 @Slf4j
+@SuppressWarnings({"unchecked", "rawtypes"})
 public class RedisRemoteDictionary extends AbstractRemoteDictionary {
 
 	private final StatefulRedisConnection<String, String> redisConnection;
+	private final StatefulRedisClusterConnection<String, String> redisClusterConnection;
 
 	private final static String KEY_PREFIX = "es-ik-words";
 
 	public RedisRemoteDictionary(RemoteConfiguration remoteConfiguration) {
 		super(remoteConfiguration);
-		this.redisConnection = this.getRedisConnection();
+		RemoteConfiguration.Redis redis = this.remoteConfiguration.getRedis();
+		this.redisClusterConnection = this.getRedisClusterConnection(redis);
+		this.redisConnection = this.getRedisConnection(redis);
 	}
 
 	@Override
@@ -65,7 +76,7 @@ public class RedisRemoteDictionary extends AbstractRemoteDictionary {
 									  String etymology,
 									  String domain) {
 		log.info("'redis' remote dictionary get new words from domain '{}' dictionary '{}'", domain, dictionaryType);
-		RedisCommands<String, String> sync = this.redisConnection.sync();
+		final RedisSortedSetCommands<String, String> sync = this.getCommands();
 		String key = this.getKey(dictionaryType, domain);
 		List<String> words = sync.zrange(key, 0, -1);
 		this.resetState(dictionaryType, domain);
@@ -84,7 +95,7 @@ public class RedisRemoteDictionary extends AbstractRemoteDictionary {
 	}
 
 	private boolean resetState(DictionaryType dictionaryType, String domain) {
-		RedisCommands<String, String> sync = this.redisConnection.sync();
+		final RedisStringCommands<String, String> sync = this.getCommands();
 		// 当前 对应的 *-state key为true时，进行reload
 		String key = this.getKey(dictionaryType, domain);
 		String state = this.getStateKey(key);
@@ -101,8 +112,7 @@ public class RedisRemoteDictionary extends AbstractRemoteDictionary {
 	@Override
 	protected boolean addWord(DictionaryType dictionaryType, String domain, String... words) {
 		log.info("'redis' remote dictionary add new word '{}' for dictionary '{}'", words, dictionaryType);
-		RedisCommands<String, String> sync = this.redisConnection.sync();
-		sync.multi();
+		final RedisSortedSetCommands<String, String> sync = this.getCommands();
 		String key = this.getKey(dictionaryType, domain);
 		List<ScoredValue<String>> scoresAndValues = new ArrayList<>(words.length * 2);
 		for (int i = 0; i < words.length; i++) {
@@ -110,23 +120,23 @@ public class RedisRemoteDictionary extends AbstractRemoteDictionary {
 		}
 		sync.zadd(key, scoresAndValues.toArray());
 		String state = this.getStateKey(key);
-		sync.set(state, DomainDictState.NEWLY.state);
-		TransactionResult transactionResult = sync.exec();
-		for (Object txRet : transactionResult) {
-			log.info("txRet '{}'", txRet);
-		}
+		((RedisStringCommands)sync).set(state, DomainDictState.NEWLY.state);
 		log.info("'{} add new word '{}' success.", this.etymology(), words);
 		return true;
 	}
 
 	@Override
 	protected void closeResource() {
-		if (Objects.isNull(this.redisConnection) || !this.redisConnection.isOpen()) {
+		StatefulConnection<String, String> connection = this.redisClusterConnection;
+		if (Objects.isNull(connection)) {
+			connection = this.redisConnection;
+		}
+		if (Objects.isNull(connection) || !connection.isOpen()) {
 			return;
 		}
 		String etymology = this.etymology();
 		log.info("'{}' remote dictionary is closing...", etymology);
-		this.redisConnection.close();
+		connection.close();
 		log.info("'{}' remote dictionary is closed", etymology);
 	}
 
@@ -145,11 +155,47 @@ public class RedisRemoteDictionary extends AbstractRemoteDictionary {
 		return String.format("%s:%s:%s", KEY_PREFIX, domain, dictionaryType.getDictName());
 	}
 
-	private StatefulRedisConnection<String, String> getRedisConnection() {
-		RemoteConfiguration.Redis redis = this.remoteConfiguration.getRedis();
+	private <T> T getCommands() {
+		if (Objects.nonNull(this.redisClusterConnection)) {
+			return (T)this.redisClusterConnection.sync();
+		}
+		return (T)this.redisConnection.sync();
+	}
+
+	private StatefulRedisClusterConnection<String, String> getRedisClusterConnection(RemoteConfiguration.Redis redis) {
+		final RemoteConfiguration.Redis.Cluster cluster = redis.getCluster();
+		List<String> nodes = null;
+		if (Objects.nonNull(cluster) && ValidateKit.isNotEmpty(nodes = cluster.getNodes())) {
+			List<RedisURI> initialUris = new ArrayList<>();
+			nodes.stream()
+					.filter(ValidateKit::isNotEmpty)
+					.forEach(node -> {
+						final String[] hostPort = node.split(":");
+						if (ValidateKit.isNull(hostPort) || hostPort.length != 2) {
+							return;
+						}
+						initialUris.add(this.getRedisUri(redis, hostPort[0], Integer.parseInt(hostPort[1])));
+					});
+			if (ValidateKit.isNotEmpty(initialUris)) {
+				return RedisClusterClient.create(initialUris).connect();
+			}
+		}
+		return null;
+	}
+
+	private StatefulRedisConnection<String, String> getRedisConnection(RemoteConfiguration.Redis redis) {
+		if (Objects.nonNull(this.redisClusterConnection)) {
+			return null;
+		}
+
+		return RedisClient.create(this.getRedisUri(redis, redis.getHost(), redis.getPort())).connect();
+	}
+
+	private RedisURI getRedisUri(RemoteConfiguration.Redis redis, String host, Integer port) {
 		RedisURI.Builder builder = RedisURI.builder()
-				.withHost(redis.getHost())
-				.withPort(redis.getPort())
+				.withHost(host)
+				.withPort(port)
+				.withSsl(redis.isSsl())
 				.withDatabase(redis.getDatabase());
 		String username = redis.getUsername();
 		String password = redis.getPassword();
@@ -158,6 +204,6 @@ public class RedisRemoteDictionary extends AbstractRemoteDictionary {
 		} else if (Objects.nonNull(password)) {
 			builder.withPassword(password.toCharArray());
 		}
-		return RedisClient.create(builder.build()).connect();
+		return builder.build();
 	}
 }

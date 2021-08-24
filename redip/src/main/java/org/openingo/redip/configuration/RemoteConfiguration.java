@@ -29,6 +29,8 @@ package org.openingo.redip.configuration;
 
 import lombok.Data;
 
+import java.util.List;
+
 /**
  * RemoteConfiguration
  *
@@ -66,6 +68,16 @@ public class RemoteConfiguration {
         private String username;
         private String password;
         private Integer database = 0;
+        private Cluster cluster;
+        private boolean ssl = false;
+        @Data
+        public static class Cluster {
+            /**
+             * Comma-separated list of "host:port" pairs to bootstrap from. This represents an
+             * "initial" list of cluster nodes and is required to have at least one entry.
+             */
+            private List<String> nodes;
+        }
     }
 
     @Data
